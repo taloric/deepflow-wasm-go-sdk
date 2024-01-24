@@ -136,3 +136,78 @@ func ParseActionAbortWithL7Info(info []*L7ProtocolInfo) Action {
 		payloadResult: info,
 	}
 }
+
+type assembleAction struct {
+	e             error
+	isAbort       bool
+	payloadResult []*L7ProtocolInfo
+}
+
+func (a *assembleAction) getParsePayloadResult() ([]*L7ProtocolInfo, error) {
+	return a.payloadResult, a.e
+}
+
+func (e *assembleAction) abort() bool {
+	return e.isAbort
+}
+
+func checkActionPayload(aa *assembleAction) {
+	if aa.payloadResult == nil {
+		aa.payloadResult = make([]*L7ProtocolInfo, 0)
+	}
+}
+
+func AssembleAction(opts ...ActionOpts) Action {
+	action := &assembleAction{}
+	if len(opts) > 0 {
+		for _, opt := range opts {
+			opt(action)
+		}
+	}
+	return action
+}
+
+type ActionOpts func(*assembleAction)
+
+func WithError(err error) ActionOpts {
+	return func(aa *assembleAction) {
+		aa.e = err
+	}
+}
+
+func WithAbort(abort bool) ActionOpts {
+	return func(aa *assembleAction) {
+		aa.isAbort = abort
+	}
+}
+
+func WithAttr(kv []KeyVal) ActionOpts {
+	return func(aa *assembleAction) {
+		checkActionPayload(aa)
+		aa.payloadResult = append(aa.payloadResult, &L7ProtocolInfo{Req: &Request{}, Kv: kv})
+	}
+}
+
+func WithReq(req *Request) ActionOpts {
+	return func(aa *assembleAction) {
+		checkActionPayload(aa)
+		aa.payloadResult = append(aa.payloadResult, &L7ProtocolInfo{Req: req})
+	}
+}
+
+func WithTrace(trace *Trace) ActionOpts {
+	return func(aa *assembleAction) {
+		checkActionPayload(aa)
+		aa.payloadResult = append(aa.payloadResult, &L7ProtocolInfo{Req: &Request{}, Trace: trace})
+	}
+}
+
+func WithL7ProtocolInfo(info *L7ProtocolInfo) ActionOpts {
+	return func(aa *assembleAction) {
+		checkActionPayload(aa)
+		if info.Req == nil {
+			info.Req = &Request{}
+		}
+		aa.payloadResult = append(aa.payloadResult, info)
+	}
+}
